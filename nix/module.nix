@@ -11,6 +11,7 @@ let
   serverHost = builtins.head (builtins.match "https?://([^/:]+).*" cfg.server);
   proxyUrl = "https://${serverHost}:${toString cfg.proxyPort}";
   mpvConfigDir = "/etc/sieve/mpv";
+  proxyPolicyFile = "/var/lib/sieve/chromium-proxy-policy.json";
   caName = "Sieve Proxy CA";
 
   proxyExtension = extensions.pack {
@@ -75,10 +76,11 @@ in
 
     proxyCredentialsFile = mkOption {
       type = types.str;
-      default = "/var/lib/sieve/proxy-credentials";
+      default = "/var/lib/sieve/proxy-credentials.json";
       description = ''
-        File holding the device's proxy credentials as `username:password` on one line.
-        Placed by hand, outside the Nix store; root reads it.
+        File holding the device's proxy credentials as
+        `{"username": "...", "password": "..."}`. Placed by hand, outside the Nix store; root
+        reads it.
       '';
     };
 
@@ -139,7 +141,38 @@ in
       };
     };
 
-    environment.etc."chromium/policies/managed/sieve-proxy-credentials.json".source = cfg.proxyCredentialsFile;
+    # Chromium has no flag for proxy credentials. The proxy extension reads them from managed
+    # policy storage, keyed by the extension's id, which only the build knows. This writes that
+    # policy from the credentials file whenever it changes, under /var/lib because /etc is
+    # read-only. Chromium runs as the user, so the policy has to be world-readable.
+    environment.etc."chromium/policies/managed/sieve-proxy-credentials.json".source = proxyPolicyFile;
+
+    systemd.services.sieve-proxy-credentials = {
+      description = "Give the Sieve proxy extension this device's proxy credentials";
+      wantedBy = [ "multi-user.target" ];
+      unitConfig.ConditionPathExists = cfg.proxyCredentialsFile;
+      path = [ pkgs.coreutils pkgs.jq ];
+      serviceConfig.Type = "oneshot";
+      script = ''
+        set -euo pipefail
+
+        policy=${lib.escapeShellArg proxyPolicyFile}
+        jq --arg id ${proxyExtension.id} '
+          if (.username | type) == "string" and .username != ""
+            and (.password | type) == "string" and .password != ""
+          then {"3rdparty": {extensions: {($id): {proxyUsername: .username, proxyPassword: .password}}}}
+          else error("expected {\"username\": \"...\", \"password\": \"...\"}")
+          end
+        ' ${lib.escapeShellArg cfg.proxyCredentialsFile} > "$policy.tmp"
+        chmod 0644 "$policy.tmp"
+        mv "$policy.tmp" "$policy"
+      '';
+    };
+
+    systemd.paths.sieve-proxy-credentials = {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathChanged = cfg.proxyCredentialsFile;
+    };
 
     # The proxy inspects HTTPS, so the filtered user's browser must trust its CA. Only their
     # NSS database gets it; trusting it system-wide would let the CA impersonate sites to

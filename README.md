@@ -45,7 +45,8 @@ credentials on the machine by hand. Neither file goes through the Nix store:
 sudo install -d -m 0755 /var/lib/sieve
 # The desktop manager runs as the filtered user, so they need to read the token.
 echo '<device token>' | sudo install -m 0640 -g amanda /dev/stdin /var/lib/sieve/device-token
-echo '<proxy username>:<proxy password>' | sudo install -m 0600 /dev/stdin /var/lib/sieve/proxy-credentials
+echo '{"username": "<proxy username>", "password": "<proxy password>"}' |
+  sudo install -m 0600 /dev/stdin /var/lib/sieve/proxy-credentials.json
 ```
 
 Paths can be changed with `deviceTokenFile` and `proxyCredentialsFile`. Changing the
@@ -58,7 +59,7 @@ credentials file is picked up automatically; the token is read when the desktop 
 | `user` | — | The filtered user |
 | `proxyPort` | `3129` | The server's TLS-wrapped proxy port |
 | `deviceTokenFile` | `/var/lib/sieve/device-token` | |
-| `proxyCredentialsFile` | `/var/lib/sieve/proxy-credentials` | `username:password` on one line |
+| `proxyCredentialsFile` | `/var/lib/sieve/proxy-credentials.json` | `{"username": "...", "password": "..."}` |
 | `adminExtension.enable` | `true` | Install the admin bar |
 
 ## What runs
@@ -68,7 +69,7 @@ credentials file is picked up automatically; the token is read when the desktop 
 | `sieve-desktop-manager` | user service, filtered user | Follows `/api/<workspace>/events`, rewrites launcher entries and icons from `/applications` |
 | `launcher` | user service, filtered user | The drawer; start it from the session (e.g. labwc autostart) |
 | `install-chromium-ca` | user service, filtered user | Downloads `/api/proxy-ca.crt` and trusts it in the user's NSS database; retries every 30 s if offline |
-| `sieve-proxy-credentials` | system service + path unit | Writes the proxy credentials into Chromium managed policy for the proxy extension |
+| `sieve-proxy-credentials` | system service + path unit | Turns the credentials file into Chromium managed policy for the proxy extension, at `/var/lib/sieve/chromium-proxy-policy.json` (linked from `/etc/chromium/policies/managed`) |
 
 Chromium apps launch with `--proxy-server=https://<server>:<proxyPort>`, and the proxy extension
 answers the proxy's login prompt. Videos play in mpv with `/etc/sieve/mpv`.
