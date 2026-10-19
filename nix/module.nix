@@ -171,7 +171,6 @@ in
           certutil -N -d "sql:$db" --empty-password
         fi
 
-        # "Squid Proxy CA" is the name the previous local setup used.
         for name in ${lib.escapeShellArg caName} "Squid Proxy CA"; do
           certutil -D -n "$name" -d "sql:$db" 2>/dev/null || true
         done

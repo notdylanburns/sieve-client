@@ -20,7 +20,10 @@
 
           cp -r $src ./extdir
           chmod -R u+w ./extdir
-          (cd ./extdir && ${configure})
+
+          pushd ./extdir
+          ${configure}
+          popd
 
           chromium --headless --disable-gpu --no-sandbox --pack-extension=./extdir
           mv ./extdir.crx $out/extension.crx
