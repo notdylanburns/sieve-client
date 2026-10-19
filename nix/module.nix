@@ -121,6 +121,7 @@ in
         BrowserAddPersonEnabled = false;
         BrowserSignin = 0;
         SyncDisabled = true;
+        DefaultSearchProviderContextMenuAccessAllowed = false;
 
         DownloadRestrictions = 3;
         AllowFileSelectionDialogs = false;

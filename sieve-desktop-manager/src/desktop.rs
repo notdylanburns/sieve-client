@@ -41,7 +41,10 @@ pub fn is_safe_name(name: &str) -> bool {
 
 /// The local file name for an application's icon, if it has a usable one.
 pub fn icon_name(application: &Application) -> Option<&str> {
-    let name = application.icon.as_deref()?.strip_prefix("/static/icons/")?;
+    let name = application
+        .icon
+        .as_deref()?
+        .strip_prefix("/static/icons/")?;
     is_safe_name(name).then_some(name)
 }
 
@@ -77,14 +80,22 @@ fn command(config: &Config, application: &Application) -> String {
 fn desktop_entry(config: &Config, application: &Application, icon: &str) -> String {
     format!(
         "[Desktop Entry]\nName={name}\nExec={launcher} launch {id}\nIcon={icon}\nType=Application\nTerminal=false\n",
-        name = application.name.split_whitespace().collect::<Vec<_>>().join(" "),
+        name = application
+            .name
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" "),
         launcher = config.launcher_bin,
         id = application.id,
     )
 }
 
 fn start_script(config: &Config, application: &Application) -> String {
-    format!("#!{}\nexec {}\n", config.shell_bin, command(config, application))
+    format!(
+        "#!{}\nexec {}\n",
+        config.shell_bin,
+        command(config, application)
+    )
 }
 
 type Inventory = HashMap<Box<OsStr>, PathBuf>;
@@ -156,8 +167,16 @@ pub fn install(config: &Config, applications: &[Application]) -> std::io::Result
         stale_entries.remove(entry_path.file_name().unwrap_or_default());
         stale_scripts.remove(script_path.file_name().unwrap_or_default());
 
-        write_atomically(&entry_path, desktop_entry(config, application, &icon).as_bytes(), 0o644)?;
-        write_atomically(&script_path, start_script(config, application).as_bytes(), 0o744)?;
+        write_atomically(
+            &entry_path,
+            desktop_entry(config, application, &icon).as_bytes(),
+            0o644,
+        )?;
+        write_atomically(
+            &script_path,
+            start_script(config, application).as_bytes(),
+            0o744,
+        )?;
     }
 
     remove_all(stale_entries);
@@ -204,7 +223,10 @@ pub(crate) mod tests {
 
     #[test]
     fn quotes_urls_for_the_shell() {
-        assert_eq!(shell_quote("https://youtube.com/watch?v=a&t=1"), "'https://youtube.com/watch?v=a&t=1'");
+        assert_eq!(
+            shell_quote("https://youtube.com/watch?v=a&t=1"),
+            "'https://youtube.com/watch?v=a&t=1'"
+        );
         assert_eq!(shell_quote("it's"), "'it'\\''s'");
     }
 
@@ -216,9 +238,18 @@ pub(crate) mod tests {
         for bad in ["", "../etc/passwd", "a/b", ".hidden", "a b", "x\n"] {
             assert!(!is_safe_name(bad), "{bad:?}");
         }
-        assert_eq!(icon_name(&app("a", Kind::Web, Some("/static/icons/ab.png"))), Some("ab.png"));
-        assert_eq!(icon_name(&app("a", Kind::Web, Some("/static/icons/../x"))), None);
-        assert_eq!(icon_name(&app("a", Kind::Web, Some("https://evil/x.png"))), None);
+        assert_eq!(
+            icon_name(&app("a", Kind::Web, Some("/static/icons/ab.png"))),
+            Some("ab.png")
+        );
+        assert_eq!(
+            icon_name(&app("a", Kind::Web, Some("/static/icons/../x"))),
+            None
+        );
+        assert_eq!(
+            icon_name(&app("a", Kind::Web, Some("https://evil/x.png"))),
+            None
+        );
         assert_eq!(icon_name(&app("a", Kind::Web, None)), None);
     }
 
@@ -232,8 +263,9 @@ pub(crate) mod tests {
              --app='https://example.com/it'\\''s?a=1&b=2'\n"
         );
         assert!(
-            start_script(&config, &app("video-1", Kind::Video, None))
-                .contains("'/nix/store/x-mpv/bin/mpv' --config-dir='/etc/sieve/mpv' --force-window=immediate")
+            start_script(&config, &app("video-1", Kind::Video, None)).contains(
+                "'/nix/store/x-mpv/bin/mpv' --config-dir='/etc/sieve/mpv' --force-window=immediate"
+            )
         );
     }
 
@@ -251,20 +283,38 @@ pub(crate) mod tests {
         ];
         install(&config, &apps).unwrap();
 
-        let entry = std::fs::read_to_string(applications_dir(&config).join("chromium-domain-1.desktop")).unwrap();
+        let entry =
+            std::fs::read_to_string(applications_dir(&config).join("chromium-domain-1.desktop"))
+                .unwrap();
         assert!(entry.contains("Name=A Site Name\n"));
-        assert!(entry.contains("Exec=/nix/store/x-launcher/bin/launcher launch chromium-domain-1\n"));
-        assert!(entry.contains(&format!("Icon={}\n", icons_dir(&config).join("ab.png").display())));
+        assert!(
+            entry.contains("Exec=/nix/store/x-launcher/bin/launcher launch chromium-domain-1\n")
+        );
+        assert!(entry.contains(&format!(
+            "Icon={}\n",
+            icons_dir(&config).join("ab.png").display()
+        )));
 
-        let video = std::fs::read_to_string(applications_dir(&config).join("video-2.desktop")).unwrap();
-        assert!(video.contains("Icon=video-x-generic\n"), "missing icon falls back");
+        let video =
+            std::fs::read_to_string(applications_dir(&config).join("video-2.desktop")).unwrap();
+        assert!(
+            video.contains("Icon=video-x-generic\n"),
+            "missing icon falls back"
+        );
 
         let script = config.bin_dir.join("chromium-domain-1");
-        assert_eq!(std::fs::metadata(&script).unwrap().permissions().mode() & 0o777, 0o744);
+        assert_eq!(
+            std::fs::metadata(&script).unwrap().permissions().mode() & 0o777,
+            0o744
+        );
         assert!(!home.join(".local/share/sieve/escape.desktop").exists());
 
         install(&config, &apps[1..2]).unwrap();
-        assert!(!applications_dir(&config).join("chromium-domain-1.desktop").exists());
+        assert!(
+            !applications_dir(&config)
+                .join("chromium-domain-1.desktop")
+                .exists()
+        );
         assert!(!script.exists());
         assert!(applications_dir(&config).join("video-2.desktop").exists());
 
