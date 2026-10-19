@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "proxyUsername": {
+      "description": "The device's Sieve proxy username",
+      "type": "string"
+    },
+    "proxyPassword": {
+      "description": "The device's Sieve proxy password",
+      "type": "string"
+    }
+  }
+}

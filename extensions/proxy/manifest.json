@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Sieve Proxy",
+  "version": "2.0",
+  "permissions": [
+    "storage",
+    "tabs",
+    "webNavigation",
+    "webRequest",
+    "webRequestAuthProvider",
+    "webRequestBlocking"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "storage": {
+    "managed_schema": "schema.json"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
